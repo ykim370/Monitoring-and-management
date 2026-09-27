@@ -1,0 +1,16 @@
+node_modules/
+artifacts/
+*.tar.gz
+dist/
+.env
+.env.*
+!.env.example
+.dev.vars
+.cache/
+.wrangler/
+test-results/
+playwright-report/
+
+.data/
+public/fonts/files/
+public/fonts/font.css

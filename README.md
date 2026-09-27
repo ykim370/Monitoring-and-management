@@ -36,9 +36,9 @@ See [Alpha Vantage documentation](https://www.alphavantage.co/documentation/).
 
 The browser requests same-origin `/api/prices`, `/api/revenue` and `/api/estimates`. The Node server (local development) or Worker (Sites) supplies the secret to Alpha Vantage. Errors and responses never include the key.
 
-The server validates provider notices and OHLCV records, normalizes payloads, coalesces identical requests, paces upstream starts (default 1,100 ms), and caches prices for one hour and fundamentals for six hours. In Sites, the internal Worker cache survives individual Worker instances subject to normal edge cache eviction. Local Node caching is in memory.
+The server validates provider notices and OHLCV records, normalizes payloads, coalesces identical requests, paces upstream starts (default 2,000 ms), and caches prices for one hour and fundamentals for six hours. In Sites, the internal Worker cache survives individual Worker instances subject to normal edge cache eviction. Local Node caching is in memory.
 
-Open the page or press Refresh to request data. A cold load of 24 symbols needs up to 48 upstream requests; data and rankings appear progressively. There is no background scheduled monitoring. Rate limits produce explicit errors and a cooldown. The pacing queue is per process/Worker instance, not a globally coordinated quota; multiple simultaneous sessions may still hit the provider limit.
+Open the page or press Refresh to request data. A cold load of 24 symbols needs up to 48 upstream requests; data and rankings appear progressively. There is no background scheduled monitoring. Rate limits produce explicit errors and a cooldown. The browser loads one symbol at a time and retries throttled requests after 60 seconds, at most twice per refresh. The pacing queue is per process/Worker instance, not a globally coordinated quota; multiple simultaneous sessions may still hit the provider limit.
 
 Ranks use only stocks with comparable revenue and the same newest price date, excluding prices older than four calendar days. This simple freshness rule is disclosed; it does not incorporate an exchange holiday calendar. Incomplete coverage can show fewer than ten candidates per side, and the two lists never overlap. Candidate lists are relative rankings, not calibrated predictions.
 
@@ -69,3 +69,11 @@ On macOS/Windows run `npx playwright install chromium` and `npm run test:browser
 `npm run build` produces `dist/server/index.js` (Worker), `dist/server/wrangler.json`, and `dist/client/` (static assets). `.openai/hosting.json` retains the existing Sites project identity. Store the production key in a Sites secret called `ALPHAVANTAGE_API_KEY`; keep the Site owner-private.
 
 The entire development history is preserved in Git. The Sites source repository and the user-owned GitHub repository are separate remotes. Push ordinary source and lockfiles; never push `.env`, cached paid data, artifacts, or `node_modules`.
+
+## Troubleshooting provider access
+
+On Sites, Fetch supports `redirect: "manual"`; the server rejects redirect responses explicitly. The provider's “higher API call volume” notice means throttling and is shown as `RATE_LIMIT`, not invalid credentials. The dashboard waits and retries twice per refresh. If the notice persists, pause other clients using the key and ask Alpha Vantage to confirm the key's request allowance and access from the hosting environment. The app cannot override provider quotas. Missing or throttled data remains visibly unavailable.
+
+## Priority 1 — Data health
+
+The health panel shows price dates, each endpoint's last successful refresh and latest provider attempt, missing sources, and sanitized errors in New Zealand time. D1 stores validated last-known payloads. Failed refreshes retain them with explicit stale warnings; retained data is excluded from rankings. No synthetic fallback is used. Local development uses a SQLite database under the ignored `.data` directory. `npm ci` restores identical self-hosted fonts from a pinned dependency.

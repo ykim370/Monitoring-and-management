@@ -1,0 +1,16 @@
+{
+  "passed": 9,
+  "results": [
+    "Async data load creates two disjoint 10-stock lists and no fabricated holdings",
+    "Manual real-position ledger starts empty and persists edits",
+    "Scenario horizon updates actual-data calculations",
+    "Revenue chart renders; analyst estimates remain distinct from unscored company guidance",
+    "Candles, stock selector, ranges, overlays and hover work",
+    "Four-symbol comparison uses common session dates",
+    "Search and empty states work",
+    "Desktop, mobile and tablet layouts verified",
+    "Missing server key shows an error, with no fallback to synthetic prices"
+  ],
+  "errors": [],
+  "provider": "mocked provider payloads; live integration tested separately"
+}

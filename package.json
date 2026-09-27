@@ -1,0 +1,28 @@
+{
+  "name": "swing-desk",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.js",
+    "dev": "node --watch --env-file-if-exists=.env server.js",
+    "test": "node --test tests/*.test.js",
+    "build": "node --check public/app.js && node build.js",
+    "test:browser": "node tests/browser.cjs",
+    "postinstall": "node scripts/prepare-fonts.js",
+    "db:generate": "drizzle-kit generate"
+  },
+  "devDependencies": {
+    "@sparticuz/chromium": "^153.0.0",
+    "drizzle-kit": "0.31.11",
+    "esbuild": "^0.25.12",
+    "playwright": "^1.61.0"
+  },
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "dependencies": {
+    "@fontsource-variable/noto-sans-kr": "5.3.0",
+    "drizzle-orm": "0.45.3"
+  }
+}

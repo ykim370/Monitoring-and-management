@@ -1,0 +1,1 @@
+{"version":"0.2.0","configurations":[{"type":"node","request":"launch","name":"Swing Desk: server","program":"${workspaceFolder}/server.js","cwd":"${workspaceFolder}","envFile":"${workspaceFolder}/.env","skipFiles":["<node_internals>/**"],"console":"integratedTerminal"}]}
