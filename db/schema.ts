@@ -4,3 +4,4 @@ export const marketCache=sqliteTable('market_cache',{
  payload:text('payload'),expires:integer('expires').notNull().default(0),
  attemptedAt:text('attempted_at'),succeededAt:text('succeeded_at'),errorCode:text('error_code'),errorMessage:text('error_message'),
 });
+export const marketSessions=sqliteTable('market_sessions',{date:text('date').primaryKey(),observedAt:text('observed_at').notNull(),snapshot:text('snapshot').notNull()});
