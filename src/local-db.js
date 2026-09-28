@@ -6,5 +6,5 @@ export function localDatabase(filename='.data/swing-desk.sqlite'){
  for(const name of fs.readdirSync('drizzle').filter(x=>x.endsWith('.sql')).sort())if(!db.prepare('SELECT name FROM local_migrations WHERE name=?').get(name)){
   db.exec('BEGIN');try{db.exec(fs.readFileSync('drizzle/'+name,'utf8'));db.prepare('INSERT INTO local_migrations VALUES (?)').run(name);db.exec('COMMIT');}catch(e){db.exec('ROLLBACK');throw e;}
  }
- return {prepare(sql){const stmt=db.prepare(sql);const build=args=>({bind:(...a)=>build(a),first:async()=>stmt.get(...args)||null,all:async()=>({results:stmt.all(...args)}),run:async()=>stmt.run(...args)});return build([]);},close:()=>db.close()};
+ return {async batch(statements){db.exec('BEGIN');try{const results=[];for(const statement of statements)results.push(await statement.run());db.exec('COMMIT');return results;}catch(error){db.exec('ROLLBACK');throw error;}},prepare(sql){const stmt=db.prepare(sql);const build=args=>({bind:(...a)=>build(a),first:async()=>stmt.get(...args)||null,all:async()=>({results:stmt.all(...args)}),run:async()=>stmt.run(...args)});return build([]);},close:()=>db.close()};
 }
