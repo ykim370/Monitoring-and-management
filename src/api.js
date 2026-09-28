@@ -1,3 +1,4 @@
+import {providerBudget,withProviderBudget} from './provider-budget.js';
 import {holdingsImport} from './holdings-import.js';
 import {journalOutcomes} from './journal.js';
 import {alertsApi} from './alerts.js';
@@ -23,7 +24,7 @@ async function rawProvider(fn,ticker,env,context){
     const cacheUrl='https://'+(context.cacheNamespace||'swing-desk-cache.internal')+'/__market_cache/v2/'+encodeURIComponent(key);
     if(context.cache){try{const r=await context.cache.match(cacheUrl);if(r){const cached=await r.json();if(cached.expires>Date.now()){memory.set(key,cached);return {...cached.data,cacheHit:true};}}}catch{}}
     const interval=Math.max(1000,Math.min(60000,Number(env.ALPHAVANTAGE_MIN_INTERVAL_MS)||2000));
-    const result=await queuedFetch(async()=>{
+    const execute=async()=>{
       const url=new URL('https://www.alphavantage.co/query');url.search=new URLSearchParams({function:fn,symbol:ticker,apikey:env.ALPHAVANTAGE_API_KEY,...(fn==='TIME_SERIES_DAILY_ADJUSTED'?{outputsize:'full'}:{})});
       let response;try{response=await (context.fetcher||fetch)(url,{signal:AbortSignal.timeout(25000),redirect:'manual'});}catch(error){console.error('Alpha Vantage transport failure',String(error?.name||'Error'),String(error?.message||'unknown').replaceAll(env.ALPHAVANTAGE_API_KEY,'[REDACTED]').replace(/https?:\/\/\S+/g,'[URL]'));throw new DataError('UPSTREAM_UNREACHABLE','Alpha Vantage could not be reached. Retry shortly.',503);}
       if(response.status>=300&&response.status<400)throw new DataError('UPSTREAM_REDIRECT','Alpha Vantage returned an unexpected redirect.',502);
@@ -34,7 +35,8 @@ async function rawProvider(fn,ticker,env,context){
       try{validateProviderResponse(data);}catch(error){if(error.code==='RATE_LIMIT')cooldownUntil=Date.now()+60000;throw error;}
       const normalized=fn==='TIME_SERIES_DAILY_ADJUSTED'?normalizePrices(data):fn==='INCOME_STATEMENT'?normalizeRevenue(data):normalizeEstimates(data);
       return {value:normalized,fetchedAt:new Date().toISOString(),source:'Alpha Vantage',cacheHit:false};
-    },interval);
+    };
+    const result=await (env.DB?execute():queuedFetch(execute,interval));
     const entry={data:result,expires:Date.now()+TTL[fn]*1000};memory.set(key,entry);
     if(context.cache){const work=context.cache.put(cacheUrl,new Response(JSON.stringify(entry),{headers:{'Content-Type':'application/json','Cache-Control':'public, max-age='+TTL[fn]}})).catch(()=>{});context.waitUntil?context.waitUntil(work):await work;}
     return result;
@@ -45,12 +47,17 @@ async function provider(fn,ticker,env,context){
  if(store)try{previous=await store.get(key);}catch{storageWarning=true;}
  if(previous?.payload&&previous.expires>Date.now()&&!previous.error_code)return {...JSON.parse(previous.payload),cacheHit:true,stale:false};
  try{
-  const result=await rawProvider(fn,ticker,env,context);
-  if(store)try{await store.success(key,ticker,fn,result,Date.parse(result.fetchedAt)+TTL[fn]*1000);}catch{storageWarning=true;}
-  return {...result,stale:false,storageWarning};
+  return await withProviderBudget(env.DB,key,async()=>{
+   // Recheck after acquiring the shared lease: another instance may have just saved it.
+   const latest=store?await store.get(key):null;
+   if(latest?.payload&&latest.expires>Date.now()&&!latest.error_code)return {...JSON.parse(latest.payload),cacheHit:true,stale:false};
+   const result=await rawProvider(fn,ticker,env,context);
+   if(store)try{await store.success(key,ticker,fn,result,Date.parse(result.fetchedAt)+TTL[fn]*1000);}catch{storageWarning=true;}
+   return {...result,stale:false,storageWarning};
+  });
  }catch(error){
   const safe=error instanceof DataError?error:new DataError('INTERNAL_ERROR','Data request failed.',500);
-  if(store)try{await store.failure(key,ticker,fn,safe);}catch{storageWarning=true;}
+  if(store&&!['REFRESH_PENDING','BUDGET_WAIT','BUDGET_UNAVAILABLE'].includes(safe.code))try{await store.failure(key,ticker,fn,safe);}catch{storageWarning=true;}
   if(previous?.payload)return {...JSON.parse(previous.payload),cacheHit:true,stale:true,warning:{code:safe.code,message:safe.message},storageWarning};
   throw safe;
  }
@@ -60,7 +67,7 @@ export async function handleApi(request,env={},context={}){
     const url=new URL(request.url);if(['/api/import-preview','/api/holdings-import'].includes(url.pathname))return holdingsImport(request,env,context);if(url.pathname==='/api/journal-outcomes')return journalOutcomes(request,env,context);if(url.pathname==='/api/alerts')return alertsApi(request,env,context);if(url.pathname==='/api/records')return recordsApi(request,env,context);if(request.method!=='GET')return json({error:{code:'METHOD_NOT_ALLOWED',message:'Read-only API. Use GET.'}},405);
     if(url.pathname==='/api/calendar')return json(await calendarData(env,{...context,run:task=>queuedFetch(task,Math.max(1000,Number(env.ALPHAVANTAGE_MIN_INTERVAL_MS)||2000))}));
     if(url.pathname==='/api/changes')return json(await marketChanges(env.DB));
-    if(url.pathname==='/api/health'){const store=marketStore(env.DB);if(!store)return json({available:false,records:[]});return json({available:true,records:await store.all()});}
+    if(url.pathname==='/api/health'){const store=marketStore(env.DB);if(!store)return json({available:false,records:[]});return json({available:true,records:await store.all(),budget:await providerBudget(env.DB).status()});}
     if(url.pathname==='/api/status')return json({configured:!!env.ALPHAVANTAGE_API_KEY,source:'Alpha Vantage',mode:'real-eod',universe:universe.map(s=>s.ticker),guidance:'unavailable',priceCacheSeconds:3600,revenueCacheSeconds:21600});
     if(!['/api/prices','/api/revenue','/api/estimates'].includes(url.pathname))return json({error:{code:'NOT_FOUND',message:'API route not found.'}},404);
     const ticker=(url.searchParams.get('symbol')||'').toUpperCase(),meta=universe.find(s=>s.ticker===ticker);

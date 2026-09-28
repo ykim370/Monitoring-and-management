@@ -20,3 +20,14 @@ Generated Drizzle migrations are versioned; applied migrations are immutable. Pr
 ## Verification
 
 Run `npm test`, `npm run test:browser`, `node tests/features-browser.cjs`, and `npm run build`. Browser tests cover responsive layouts, plans, calendar precision, alerts, journal closes, import preview/confirm, duplicate imports, and holdings in a separate browser. Tests use fixtures and do not establish provider uptime or trading profitability.
+
+## Shared Alpha Vantage budget and rotating refresh
+
+- D1 retains successful normalized prices, revenue, estimates and earnings calendar across reloads and Worker restarts. Prices expire after one hour; fundamentals/calendar after six hours. These are daily price observations, not realtime quotes.
+- Every uncached price, revenue, estimate and calendar request uses the same atomic D1 budget: at most 70 reservations in any rolling 60 seconds, with at least 850 ms between reservations. Five of the user's stated 75/minute allowance are left as headroom. Reservations may conservatively include a request subsequently satisfied by a concurrent cache fill; the panel reports reserved slots, not provider billing.
+- An atomic per-source lease prevents duplicate concurrent fetches across Worker instances. Leases expire after 90 seconds to recover from crashes; provider calls time out after 25 seconds. If budget storage fails, external fetching pauses instead of bypassing the limit.
+- Provider throttling pauses all endpoints for 60 seconds. Source failures retry after 1, 2, 4, 8, 16 and then 30 minutes. A full local budget uses a short retry delay and does not increment provider failure counts. Last-known data remains visible with a warning and is excluded from rankings.
+- While the tab is visible, each completed cycle schedules the next one 60 seconds later. Two loading lanes circulate through missing, overdue and fresh records, prioritising selected/held stocks within each group and then oldest attempts. Cached reads spend no API calls. Previously requested estimates/calendar participate; unused estimates remain on demand. A checkbox pauses future automatic cycles; an in-flight cycle finishes normally. Hidden tabs pause future cycles and check again on return.
+- This is a page-driven refresh loop, not a background service when all tabs are closed. Reopening resumes from persisted data and shared retry state. Multiple tabs share the budget and data.
+- The limiter covers this Site only. Other projects using the same API key are not observable; five calls of headroom cannot guarantee spare capacity for them. Provider notices always take precedence over the configured plan allowance.
+- Tests use fixture payloads: concurrent reservation races, rolling-window exhaustion/recovery, per-source leases, exponential backoff, global cooldown, crash recovery, storage outage, cached data after memory reset, rotation ordering and browser timer/pause behaviour.

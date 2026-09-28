@@ -83,3 +83,6 @@ The health panel shows price dates, each endpoint's last successful refresh and 
 See [FEATURES.md](docs/FEATURES.md) for the health panel, risk overview, change feed, private plans, earnings calendar, alerts, journal, CSV import, and account-scoped holdings sync. All eight have separate GitHub checkpoints. Local Node development uses the ignored `.data/swing-desk.sqlite` database and applies the versioned migrations on startup.
 
 `npm ci` restores self-hosted font assets from the exact pinned Fontsource dependency. For the complete feature browser check run `node tests/features-browser.cjs` after preparing the test browser.
+
+### API budget and refresh
+The hosted dashboard now shares a durable 70-request rolling-minute budget across prices, revenue, estimates and earnings calendar. It caches responses, prevents duplicate concurrent fetches, backs off after failures, and rotates the watchlist every 60 seconds after the previous cycle finishes while the tab is visible. Prices are daily data (one-hour cache); fundamentals/calendar use six-hour caches. Fresh reads do not spend provider calls. See `docs/FEATURES.md` for timing, recovery behaviour and the limitation when another project uses the same key.
