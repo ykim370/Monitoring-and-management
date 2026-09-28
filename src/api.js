@@ -1,3 +1,4 @@
+import {journalOutcomes} from './journal.js';
 import {alertsApi} from './alerts.js';
 import {calendarData} from './calendar.js';
 import {recordsApi} from './records.js';
@@ -55,7 +56,7 @@ async function provider(fn,ticker,env,context){
 }
 export async function handleApi(request,env={},context={}){
   try{
-    const url=new URL(request.url);if(url.pathname==='/api/alerts')return alertsApi(request,env,context);if(url.pathname==='/api/records')return recordsApi(request,env,context);if(request.method!=='GET')return json({error:{code:'METHOD_NOT_ALLOWED',message:'Read-only API. Use GET.'}},405);
+    const url=new URL(request.url);if(url.pathname==='/api/journal-outcomes')return journalOutcomes(request,env,context);if(url.pathname==='/api/alerts')return alertsApi(request,env,context);if(url.pathname==='/api/records')return recordsApi(request,env,context);if(request.method!=='GET')return json({error:{code:'METHOD_NOT_ALLOWED',message:'Read-only API. Use GET.'}},405);
     if(url.pathname==='/api/calendar')return json(await calendarData(env,{...context,run:task=>queuedFetch(task,Math.max(1000,Number(env.ALPHAVANTAGE_MIN_INTERVAL_MS)||2000))}));
     if(url.pathname==='/api/changes')return json(await marketChanges(env.DB));
     if(url.pathname==='/api/health'){const store=marketStore(env.DB);if(!store)return json({available:false,records:[]});return json({available:true,records:await store.all()});}

@@ -3,6 +3,14 @@ const reply=(data,status=200)=>new Response(JSON.stringify(data),{status,headers
 export async function captureEvidence(db,ticker){const rows=(await db.prepare('SELECT kind,payload,error_code FROM market_cache WHERE ticker=? AND payload IS NOT NULL').bind(ticker).all()).results;const price=rows.find(r=>r.kind==='TIME_SERIES_DAILY_ADJUSTED'),revenue=rows.find(r=>r.kind==='INCOME_STATEMENT');if(!price)return {available:false,capturedAt:new Date().toISOString()};const p=JSON.parse(price.payload);const stock=analyzeStock({...universe.find(s=>s.ticker===ticker),...p.value,revenue:revenue?JSON.parse(revenue.payload).value:[]});return {available:true,capturedAt:new Date().toISOString(),asOf:stock.asOf,fetchedAt:p.fetchedAt,retained:!!price.error_code,score:stock.score,parts:stock.parts,bars:stock.bars.slice(-60)};}
 export function validateRecord(kind,p){
  if(!p||typeof p!=='object'||Array.isArray(p))throw Error('Invalid record.');
+ if(kind==='journal'){
+  if(!universe.some(s=>s.ticker===p.ticker)||!['long','short'].includes(p.side))throw Error('Invalid journal stock or direction.');
+  const validDate=d=>typeof d==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(d)&&new Date(d+'T00:00:00Z').toISOString().slice(0,10)===d;
+  if(!validDate(p.entryDate)||p.entryDate>new Date().toISOString().slice(0,10))throw Error('Invalid entry date.');
+  if(!Number.isFinite(p.entry)||p.entry<=0||!Number.isFinite(p.qty)||p.qty<=0||!Number.isFinite(p.cost)||p.cost<0||typeof p.notes!=='string'||p.notes.length>2000)throw Error('Invalid journal values.');
+  if(p.exit!==null&&(!Number.isFinite(p.exit)||p.exit<=0||!validDate(p.exitDate)||p.exitDate<p.entryDate||p.exitDate>new Date().toISOString().slice(0,10)))throw Error('Invalid exit price or date.');
+  return {ticker:p.ticker,side:p.side,entry:p.entry,entryDate:p.entryDate,qty:p.qty,cost:p.cost,notes:p.notes,exit:p.exit,exitDate:p.exit===null?null:p.exitDate};
+ }
  if(kind==='alerts'){if(!universe.some(s=>s.ticker===p.ticker)||!['score_above','price_above','price_below','breakout_up','breakout_down','stale'].includes(p.type))throw Error('Invalid alert rule.');if(!Number.isFinite(p.threshold)||p.threshold<0||(p.type==='score_above'&&p.threshold>100)||!Number.isInteger(p.cooldownMinutes)||p.cooldownMinutes<1||p.cooldownMinutes>10080||typeof p.enabled!=='boolean')throw Error('Invalid alert threshold or cooldown.');return {ticker:p.ticker,type:p.type,threshold:p.threshold,cooldownMinutes:p.cooldownMinutes,enabled:p.enabled};}
  if(kind!=='plans')throw Error('Unsupported record type.');
  if(!universe.some(s=>s.ticker===p.ticker))throw Error('Unsupported stock.');
@@ -12,7 +20,7 @@ export function validateRecord(kind,p){
 export async function recordsApi(request,env,context={}){
  const user=context.localUserId||request.headers.get('oai-authenticated-user-id');if(!user)return reply({error:{message:'Sign in to access private records.'}},401);
  if(!env.DB)return reply({error:{message:'Private storage unavailable. Your input has not been saved.'}},503);
- const url=new URL(request.url),kind=url.searchParams.get('kind');if(!['plans','alerts'].includes(kind))return reply({error:{message:'Unsupported record type.'}},400);
+ const url=new URL(request.url),kind=url.searchParams.get('kind');if(!['plans','alerts','journal'].includes(kind))return reply({error:{message:'Unsupported record type.'}},400);
  try{
  if(request.method==='GET'){const rows=(await env.DB.prepare('SELECT id,revision,payload,updated_at FROM user_records WHERE user_id=? AND kind=? ORDER BY updated_at DESC').bind(user,kind).all()).results;return reply({records:rows.map(r=>({...r,payload:JSON.parse(r.payload)}))});}
  if(!['PUT','DELETE'].includes(request.method))return reply({error:{message:'Method not allowed.'}},405);
@@ -23,7 +31,8 @@ export async function recordsApi(request,env,context={}){
  if(request.method==='DELETE'){const r=await env.DB.prepare('DELETE FROM user_records WHERE user_id=? AND kind=? AND id=? AND revision=?').bind(user,kind,body.id,body.revision).run();return (r.meta?.changes??r.changes)?reply({deleted:true}):reply({error:{message:'Record changed elsewhere. Reload before deleting.'}},409);}
  const payload=validateRecord(kind,body.payload);
  const existing=await env.DB.prepare('SELECT payload FROM user_records WHERE user_id=? AND kind=? AND id=?').bind(user,kind,body.id).first();
- if(kind==='plans')payload.evidence=existing?JSON.parse(existing.payload).evidence:await captureEvidence(env.DB,payload.ticker);
+ if(kind==='journal'&&existing){const old=JSON.parse(existing.payload);if(['ticker','side','entry','entryDate','qty'].some(k=>old[k]!==payload[k]))return reply({error:{message:'Original trade fields are immutable; create a separate corrected entry.'}},400);}
+ if(['plans','journal'].includes(kind))payload.evidence=existing?JSON.parse(existing.payload).evidence:await captureEvidence(env.DB,payload.ticker);
  const now=new Date().toISOString();
  const result=body.revision===0?await env.DB.prepare('INSERT INTO user_records (user_id,kind,id,revision,payload,updated_at) VALUES (?,?,?,1,?,?) ON CONFLICT(user_id,kind,id) DO NOTHING').bind(user,kind,body.id,JSON.stringify(payload),now).run():await env.DB.prepare('UPDATE user_records SET revision=revision+1,payload=?,updated_at=? WHERE user_id=? AND kind=? AND id=? AND revision=?').bind(JSON.stringify(payload),now,user,kind,body.id,body.revision).run();
  if(!(result.meta?.changes??result.changes))return reply({error:{message:'Record changed elsewhere. Reload to avoid overwriting it.'}},409);return reply({saved:true,revision:body.revision+1});
