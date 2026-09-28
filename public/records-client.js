@@ -1,0 +1,2 @@
+export async function records(kind,method='GET',body){const r=await fetch('/api/records?kind='+encodeURIComponent(kind),{method,headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined});const d=await r.json();if(!r.ok)throw Error(d.error?.message||'Private storage unavailable.');return d;}
+export const safe=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));

@@ -4,12 +4,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {handleApi} from './src/api.js';
+async function readBody(req){let body='';for await(const chunk of req){body+=chunk;if(body.length>20000)throw Error('Request too large');}return body;}
 export function createServer(env=process.env,apiContext={}){
   const root=path.resolve('public');
   return http.createServer(async(req,res)=>{
     try{
-      const url=new URL(req.url,'http://localhost');
-      if(url.pathname.startsWith('/api/')){const response=await handleApi(new Request(url,{method:req.method}),env,apiContext);res.writeHead(response.status,Object.fromEntries(response.headers));res.end(await response.text());return;}
+      const url=new URL(req.url,'http://'+(req.headers.host||'localhost'));
+      if(url.pathname.startsWith('/api/')){const response=await handleApi(new Request(url,{method:req.method,headers:req.headers,...(!['GET','HEAD'].includes(req.method)?{body:await readBody(req)}:{})}),env,{...apiContext,localUserId:'local-owner'});res.writeHead(response.status,Object.fromEntries(response.headers));res.end(await response.text());return;}
       if(!['GET','HEAD'].includes(req.method)){res.writeHead(405).end();return;}
       let file=path.resolve(root,'.'+decodeURIComponent(url.pathname));
       if((!file.startsWith(root+path.sep)&&file!==root)||url.pathname.split('/').some(p=>p.startsWith('.'))){res.writeHead(403).end();return;}

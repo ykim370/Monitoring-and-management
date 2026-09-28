@@ -1,3 +1,4 @@
+import {recordsApi} from './records.js';
 import {marketChanges} from './changes.js';
 import {marketStore} from './storage.js';
 import {universe} from '../public/engine.js';
@@ -52,7 +53,7 @@ async function provider(fn,ticker,env,context){
 }
 export async function handleApi(request,env={},context={}){
   try{
-    const url=new URL(request.url);if(request.method!=='GET')return json({error:{code:'METHOD_NOT_ALLOWED',message:'Read-only API. Use GET.'}},405);
+    const url=new URL(request.url);if(url.pathname==='/api/records')return recordsApi(request,env,context);if(request.method!=='GET')return json({error:{code:'METHOD_NOT_ALLOWED',message:'Read-only API. Use GET.'}},405);
     if(url.pathname==='/api/changes')return json(await marketChanges(env.DB));
     if(url.pathname==='/api/health'){const store=marketStore(env.DB);if(!store)return json({available:false,records:[]});return json({available:true,records:await store.all()});}
     if(url.pathname==='/api/status')return json({configured:!!env.ALPHAVANTAGE_API_KEY,source:'Alpha Vantage',mode:'real-eod',universe:universe.map(s=>s.ticker),guidance:'unavailable',priceCacheSeconds:3600,revenueCacheSeconds:21600});
