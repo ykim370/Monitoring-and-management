@@ -29,3 +29,8 @@ The full live browser check loaded 24 price histories and 23 usable revenue seri
 
 - Final hosted full-load check: the JavaScript page rendered without browser errors, but Alpha Vantage continued returning its volume notice after the bounded cooldowns. The full 24-stock production load therefore did **not** pass. The app accurately displayed RATE_LIMIT and did not generate substitute prices. A contemporaneous direct Node request with the same supplied key returned valid OHLCV data. This establishes a production-path/provider throttling issue, not proof of a particular plan limit or IP policy.
 - Reapplied the user-supplied key as a production secret (environment revision 3); the volume notice persisted. No public audience change was made.
+
+
+## Priorities 1–8 — September 2026
+
+Implemented and pushed in order: health/persistence, portfolio risk, daily change snapshots, private plans, calendar, alert rules, journal/outcomes, and holdings import/sync. GitHub checkpoints contain exact source-tree matches to each local checkpoint. Tests use explicit provider fixtures, including outages and throttling, and validate private account isolation, same-origin writes, optimistic conflicts, transactional duplicate handling, and reload/cross-browser persistence. The deployment remains owner-private. See FEATURES.md for exact scope and limitations.

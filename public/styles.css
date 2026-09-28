@@ -10,3 +10,5 @@
 #data-health{padding:20px;margin:24px 0}#data-health .table-scroll{max-height:330px}#data-health table{width:100%;min-width:780px}#data-health th{position:sticky;top:0;background:var(--panel,#18211c)}#health-status{margin:12px 0;color:var(--muted)}
 
 .feature-panel{padding:24px;margin:24px 0}.feature-controls{display:flex;gap:18px;flex-wrap:wrap;margin:16px 0}.feature-controls label{display:flex;flex-direction:column;gap:8px;color:var(--muted);font-size:12px}.feature-controls input,.feature-controls select,.feature-panel textarea{background:#111915;color:var(--text);border:1px solid var(--line,#324035);padding:10px;border-radius:6px}.feature-panel p{line-height:1.6;color:var(--muted);font-size:13px;margin:12px 0}.feature-panel table{width:100%}.feature-panel td,.feature-panel th{text-align:left;padding:12px}.feature-panel textarea{width:100%;min-height:70px}.feature-panel button{margin:6px 6px 6px 0}
+
+.sidebar nav{max-height:48vh;overflow-y:auto}.feature-panel details{padding:14px 0;border-bottom:1px solid var(--line,#324035)}.feature-panel summary{cursor:pointer;line-height:1.6}.feature-panel svg{display:block;max-width:100%}

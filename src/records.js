@@ -1,8 +1,9 @@
-import {planMetrics} from '../public/plan-model.js';import {universe,analyzeStock} from '../public/engine.js';
+import {planMetrics} from '../public/plan-model.js';import {universe,analyzeStock,validateHoldings} from '../public/engine.js';
 const reply=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json','Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});
 export async function captureEvidence(db,ticker){const rows=(await db.prepare('SELECT kind,payload,error_code FROM market_cache WHERE ticker=? AND payload IS NOT NULL').bind(ticker).all()).results;const price=rows.find(r=>r.kind==='TIME_SERIES_DAILY_ADJUSTED'),revenue=rows.find(r=>r.kind==='INCOME_STATEMENT');if(!price)return {available:false,capturedAt:new Date().toISOString()};const p=JSON.parse(price.payload);const stock=analyzeStock({...universe.find(s=>s.ticker===ticker),...p.value,revenue:revenue?JSON.parse(revenue.payload).value:[]});return {available:true,capturedAt:new Date().toISOString(),asOf:stock.asOf,fetchedAt:p.fetchedAt,retained:!!price.error_code,score:stock.score,parts:stock.parts,bars:stock.bars.slice(-60)};}
 export function validateRecord(kind,p){
  if(!p||typeof p!=='object'||Array.isArray(p))throw Error('Invalid record.');
+ if(kind==='holdings'){if(!validateHoldings(p.positions))throw Error('Invalid holdings.');return {positions:p.positions.map(h=>({ticker:h.ticker,qty:h.qty,avg:h.avg}))};}
  if(kind==='journal'){
   if(!universe.some(s=>s.ticker===p.ticker)||!['long','short'].includes(p.side))throw Error('Invalid journal stock or direction.');
   const validDate=d=>typeof d==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(d)&&new Date(d+'T00:00:00Z').toISOString().slice(0,10)===d;
@@ -20,7 +21,7 @@ export function validateRecord(kind,p){
 export async function recordsApi(request,env,context={}){
  const user=context.localUserId||request.headers.get('oai-authenticated-user-id');if(!user)return reply({error:{message:'Sign in to access private records.'}},401);
  if(!env.DB)return reply({error:{message:'Private storage unavailable. Your input has not been saved.'}},503);
- const url=new URL(request.url),kind=url.searchParams.get('kind');if(!['plans','alerts','journal'].includes(kind))return reply({error:{message:'Unsupported record type.'}},400);
+ const url=new URL(request.url),kind=url.searchParams.get('kind');if(!['plans','alerts','journal','holdings'].includes(kind))return reply({error:{message:'Unsupported record type.'}},400);
  try{
  if(request.method==='GET'){const rows=(await env.DB.prepare('SELECT id,revision,payload,updated_at FROM user_records WHERE user_id=? AND kind=? ORDER BY updated_at DESC').bind(user,kind).all()).results;return reply({records:rows.map(r=>({...r,payload:JSON.parse(r.payload)}))});}
  if(!['PUT','DELETE'].includes(request.method))return reply({error:{message:'Method not allowed.'}},405);
@@ -28,9 +29,11 @@ export async function recordsApi(request,env,context={}){
  if(!(request.headers.get('content-type')||'').startsWith('application/json'))return reply({error:{message:'JSON required.'}},415);
  const raw=await request.text();if(raw.length>16000)return reply({error:{message:'Record too large.'}},413);const body=JSON.parse(raw);
  if(!body||typeof body!=='object'||!/^[a-zA-Z0-9_-]{1,80}$/.test(body.id)||!Number.isInteger(body.revision)||body.revision<0)return reply({error:{message:'Invalid record version.'}},400);
+ if(kind==='holdings'&&body.id!=='portfolio')return reply({error:{message:'Invalid portfolio ID.'}},400);
  if(request.method==='DELETE'){const r=await env.DB.prepare('DELETE FROM user_records WHERE user_id=? AND kind=? AND id=? AND revision=?').bind(user,kind,body.id,body.revision).run();return (r.meta?.changes??r.changes)?reply({deleted:true}):reply({error:{message:'Record changed elsewhere. Reload before deleting.'}},409);}
  const payload=validateRecord(kind,body.payload);
  const existing=await env.DB.prepare('SELECT payload FROM user_records WHERE user_id=? AND kind=? AND id=?').bind(user,kind,body.id).first();
+ if(kind==='plans'&&existing&&JSON.parse(existing.payload).ticker!==payload.ticker)return reply({error:{message:'Create a new plan to change its stock and evidence.'}},400);
  if(kind==='journal'&&existing){const old=JSON.parse(existing.payload);if(['ticker','side','entry','entryDate','qty'].some(k=>old[k]!==payload[k]))return reply({error:{message:'Original trade fields are immutable; create a separate corrected entry.'}},400);}
  if(['plans','journal'].includes(kind))payload.evidence=existing?JSON.parse(existing.payload).evidence:await captureEvidence(env.DB,payload.ticker);
  const now=new Date().toISOString();

@@ -1,0 +1,1 @@
+CREATE INDEX `alert_events_user_created` ON `alert_events` (`user_id`,`created_at`);

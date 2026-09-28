@@ -1,0 +1,22 @@
+# Swing Desk — eight priorities
+
+Each priority is a separate GitHub checkpoint. All market features use actual provider responses at runtime; tests use explicitly labelled fixtures.
+
+1. **Data health:** Durable, validated last-known prices and fundamentals in D1; per-source attempt/success timestamps, price dates, missing fields and sanitized errors. Failed refreshes return labelled retained data. Retained or old prices are excluded from ranking.
+2. **Portfolio risk:** Position and sector weights, selected-position shock losses, and notional exposure / manually entered equity. These are long-underlying-unit scenarios. Broker margin, cash, financing and currency conversion are not connected.
+3. **What changed:** Trading-date snapshots from comparable data; score-factor differences; top-10 membership changes only when symbol coverage matches and includes at least 20 stocks. First use captures a baseline, not invented history.
+4. **Trade plans:** Long/short entry, stop, target, units, estimated total costs and reasoning. Stores original available price-chart and score evidence. No orders are sent.
+5. **Earnings:** Alpha Vantage EARNINGS_CALENDAR, filtered to watchlist or holdings. Six-hour cache and retained fallback. Reporting dates are date-only; exact NZ release times are unavailable. Retrieval timestamps use Pacific/Auckland.
+6. **Alerts:** Private rules and event history, atomic deduplication, reset-before-repeat and cooldown. Score/price/breakout rules skip stale or insufficient evidence. Checks after page refresh and each visible-tab minute use cached daily data. Browser notifications require opt-in and the open page. No background delivery, emails or continuous real-time monitoring.
+7. **Journal:** Manually entered trades, preserved original evidence, recorded exits and cost-adjusted P&L. Prospective outcomes use 5/10/20 available sessions strictly after the UTC capture date. Reference and future prices use the same split-adjusted basis; dividends excluded. Costs are the entered fixed estimate. Outcomes remain pending until data arrives. Historical-entry evidence is explicitly capture-time evidence, not point-in-time reconstructed history.
+8. **Import and sync:** Private per-user holdings survive browser/device changes. CSV column mapping and non-mutating preview; positions replace the snapshot, transactions update it using weighted-average cost. Transactions need stable broker IDs; exact repeats are skipped, conflicting IDs rejected. Long supported stocks only. Same-day transactions follow file order. Costs are not capitalized into imported average price. Version checks reject concurrent stale edits, and imports commit atomically. Old browser holdings require explicit migration.
+
+## Storage and identity
+
+Production uses Sites-injected authenticated user IDs and owner-private hosting. Every private record query is scoped to user ID. Mutations require matching Origin and JSON where a body is accepted. Prepared SQL prevents input interpolation; optimistic versions prevent silent overwrite. Alerts and portfolio/transaction imports use atomic batches. Local Node development uses SQLite and an explicit local-owner identity on its loopback-only server. Development identity is absent from the production Worker.
+
+Generated Drizzle migrations are versioned; applied migrations are immutable. Provider data and personal records are never committed to Git. The API key stays in the server environment.
+
+## Verification
+
+Run `npm test`, `npm run test:browser`, `node tests/features-browser.cjs`, and `npm run build`. Browser tests cover responsive layouts, plans, calendar precision, alerts, journal closes, import preview/confirm, duplicate imports, and holdings in a separate browser. Tests use fixtures and do not establish provider uptime or trading profitability.

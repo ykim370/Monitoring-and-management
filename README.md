@@ -26,7 +26,7 @@ Open `http://localhost:3000`. In VS Code, open the repository folder and choose 
 - Revenue: `INCOME_STATEMENT`, eight fiscal quarters, in the provider's reported currency. Revenue values are displayed in millions.
 - Analyst consensus: `EARNINGS_ESTIMATES`, loaded only when the outlook tab is selected. Forecast fiscal years are separate observations, not revision history. The endpoint does not specify a currency field; the UI labels that limitation.
 - **Company-issued revenue guidance revision history is not available in this integration.** It stays N/A and contributes no score. Analyst forecasts are not substituted for it.
-- Holdings start empty. Enter actual quantities and average cost manually. These are saved only in that browser, independently of the old demo positions.
+- Holdings start empty. Enter actual quantities and average cost manually. These are saved privately for your signed-in user. Old browser-only positions can be migrated explicitly from Import & sync.
 - No synthetic prices are loaded by the production app. Synthetic fixtures exist only under `tests/fixtures/`.
 - This is real end-of-day data, not real-time quotes. Premium access does not automatically mean US real-time data entitlement.
 
@@ -36,7 +36,7 @@ See [Alpha Vantage documentation](https://www.alphavantage.co/documentation/).
 
 The browser requests same-origin `/api/prices`, `/api/revenue` and `/api/estimates`. The Node server (local development) or Worker (Sites) supplies the secret to Alpha Vantage. Errors and responses never include the key.
 
-The server validates provider notices and OHLCV records, normalizes payloads, coalesces identical requests, paces upstream starts (default 2,000 ms), and caches prices for one hour and fundamentals for six hours. In Sites, the internal Worker cache survives individual Worker instances subject to normal edge cache eviction. Local Node caching is in memory.
+The server validates provider notices and OHLCV records, normalizes payloads, coalesces identical requests, retains last-known data in D1, paces upstream starts (default 2,000 ms), and caches prices for one hour and fundamentals for six hours. In Sites, the internal Worker cache survives individual Worker instances subject to normal edge cache eviction. Local Node caching is in memory.
 
 Open the page or press Refresh to request data. A cold load of 24 symbols needs up to 48 upstream requests; data and rankings appear progressively. There is no background scheduled monitoring. Rate limits produce explicit errors and a cooldown. The browser loads one symbol at a time and retries throttled requests after 60 seconds, at most twice per refresh. The pacing queue is per process/Worker instance, not a globally coordinated quota; multiple simultaneous sessions may still hit the provider limit.
 
@@ -77,3 +77,9 @@ On Sites, Fetch supports `redirect: "manual"`; the server rejects redirect respo
 ## Priority 1 — Data health
 
 The health panel shows price dates, each endpoint's last successful refresh and latest provider attempt, missing sources, and sanitized errors in New Zealand time. D1 stores validated last-known payloads. Failed refreshes retain them with explicit stale warnings; retained data is excluded from rankings. No synthetic fallback is used. Local development uses a SQLite database under the ignored `.data` directory. `npm ci` restores identical self-hosted fonts from a pinned dependency.
+
+## Eight-priority release
+
+See [FEATURES.md](docs/FEATURES.md) for the health panel, risk overview, change feed, private plans, earnings calendar, alerts, journal, CSV import, and account-scoped holdings sync. All eight have separate GitHub checkpoints. Local Node development uses the ignored `.data/swing-desk.sqlite` database and applies the versioned migrations on startup.
+
+`npm ci` restores self-hosted font assets from the exact pinned Fontsource dependency. For the complete feature browser check run `node tests/features-browser.cjs` after preparing the test browser.

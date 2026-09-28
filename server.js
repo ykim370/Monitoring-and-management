@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {handleApi} from './src/api.js';
-async function readBody(req){let body='';for await(const chunk of req){body+=chunk;if(body.length>20000)throw Error('Request too large');}return body;}
+async function readBody(req){let body='';for await(const chunk of req){body+=chunk;if(body.length>80000)throw Error('Request too large');}return body;}
 export function createServer(env=process.env,apiContext={}){
   const root=path.resolve('public');
   return http.createServer(async(req,res)=>{
