@@ -43,3 +43,10 @@ User selected the current 24 stocks and Value/Future/Past/Health/Dividend axes. 
 
 ### Snowflake minimum-filter diagnosis and recovery (2026-09-30 NZ)
 Screenshot used Value>=1, Future>=3, Past>=1, Health>=1, Dividend>=1 and complete-only. Live feed had zero complete stocks, but UI incorrectly described this as no qualifying stocks. Added separate pending/below/match states and visible AND/>= summary, mathematically justified partial-score lower bounds, per-request failure recovery, cursor rotation, backoff-aware tasks and fundamental collection priority. Added regression tests for the exact thresholds (equal/better accepted), strict complete-only and timeout/cooldown recovery. Provider throttling remains separately diagnosed from filtering; no scores or matches are fabricated.
+
+## Screener-first workspace and opportunity/risk radar
+- Primary navigation and page order now follow screener → radar → chart evidence; portfolio and operational panels follow research.
+- Radar adds directional strong-signal and confirmed-breakout filters, expandable score contributions, source price dates and 5/20/60-session ATR scenario percentages.
+- Query filtering occurs before ranking, so a single eligible matching stock is displayed. Lists remain disjoint; relative rank is explicitly distinguished from bearish evidence.
+- No additional provider requests or score/probability claims introduced. Universe remains the supported 24 stocks.
+- Added radar model tests and browser assertions for ordering, single matches, evidence and horizon controls.
