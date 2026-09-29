@@ -1,3 +1,5 @@
+import {stockMap,rankedUniverse} from './engine.js';
+import {SETUP_LABELS} from './pullback-model.js';
 import {fundamentalTasks,collectFundamentals} from './snowflake-refresh.js';
 import {AXES,screenSnowflakes} from './snowflake-model.js';
 import {safe} from './records-client.js';
@@ -13,12 +15,17 @@ function renderFilter(){ $('#snow-filter-chart').innerHTML=radar(AXES.map(a=>min
 function options(){return {query:$('#snow-query').value,industry:$('#snow-industry').value,minimum,complete:$('#snow-complete').checked,sort:$('#snow-sort').value};}
 const number=x=>x===null||x===undefined?'—':new Intl.NumberFormat('en-US',{maximumFractionDigits:2}).format(x);
 function renderResults(){
- const groups=screenSnowflakes(stocks,options()),rows=groups.matches,complete=stocks.filter(s=>s.complete).length;
+ const groups=screenSnowflakes(stocks,options()),complete=stocks.filter(s=>s.complete).length;
+ const timing=$('#snow-timing').value,eligible=new Set(rankedUniverse().map(s=>s.ticker));
+ const known=groups.matches.filter(r=>eligible.has(r.ticker)&&stockMap[r.ticker]?.setup?.status!=='unknown');
+ const matches=r=>{const x=stockMap[r.ticker].setup;return timing==='uptrend'?x.trendPass:timing==='watch'?['ready','watch'].includes(x.status):x.status==='ready';};
+ const rows=timing==='research'?groups.matches:known.filter(matches);
+ $('#snow-timing-status').textContent=timing==='research'?'기업 조사 모드입니다. 매수 후보는 레이더의 장기 추세·눌림목·반등 확인을 모두 통과해야 합니다.':`단기 조건 통과 ${rows.length} · 미충족 ${known.length-rows.length} · 가격/매출/장기 이력 대기 ${groups.matches.length-known.length}. 레이더와 동일한 21일 눌림목 규칙입니다.`;
  const active=AXES.filter(a=>minimum[a]>0);
  $('#snow-filter-summary').textContent=active.length?'Required: '+active.map(a=>a+' ≥ '+minimum[a]+'/5').join(' AND '):'No minimum scores set — showing all stocks in this scope.';
  $('#snow-pending').innerHTML=groups.pending.length?`<summary>${groups.pending.length} stocks still need data — not rejected by your minimums</summary><p>These are not confirmed matches. Missing or expired inputs prevent a decision${options().complete?'; “Only complete snowflakes” also requires every check to be available':''}.</p><div class="snow-pending-list">${groups.pending.map(r=>`<button class="secondary" data-snow-detail="${r.ticker}">${r.ticker} · waiting for ${safe(r.filterAssessment.axes.join(', '))}</button>`).join('')}</div>`:'';
- $('#snow-count').textContent=`${rows.length} confirmed matches · ${groups.pending.length} awaiting data · ${groups.below.length} below minimums · ${complete}/${stocks.length} complete snowflakes`;
- $('#snow-results').innerHTML=rows.length?rows.map(r=>`<tr><td><button class="snow-stock" data-snow-detail="${r.ticker}" aria-label="View ${r.ticker} fundamental evidence"><span class="snow-mini">${radar(AXES.map(a=>r.axes[a].score))}</span><span><b>${r.ticker}</b><small>${safe(r.name)}</small></span></button></td><td>${safe(r.industry)}<small>${r.complete?'Complete snowflake':'Partial / unavailable data'}</small></td>${AXES.map(a=>`<td class="snow-score">${r.axes[a].score===null?(r.axes[a].known?`<span title="${r.axes[a].known} of 5 checks available">≥${r.axes[a].passed}<small>/ 5 · partial</small></span>`:'<span class="subtle">N/A</span>'):r.axes[a].score+'<small>/ 5</small>'}</td>`).join('')}<td><button class="secondary" data-stock="${r.ticker}">Charts</button></td></tr>`).join(''):`<tr><td colspan="8" class="empty-state">${groups.pending.length?'No confirmed matches yet. '+groups.pending.length+' stocks are awaiting enough data to evaluate your minimums.':'No stocks in the evaluated scope meet every minimum. Stocks with higher scores are included automatically.'}</td></tr>`;
+ $('#snow-count').textContent=`${rows.length} confirmed matches · ${groups.pending.length} fundamental data pending · ${groups.below.length} below fundamental minimums · ${complete}/${stocks.length} complete snowflakes`;
+ $('#snow-results').innerHTML=rows.length?rows.map(r=>`<tr><td><button class="snow-stock" data-snow-detail="${r.ticker}" aria-label="View ${r.ticker} fundamental evidence"><span class="snow-mini">${radar(AXES.map(a=>r.axes[a].score))}</span><span><b>${r.ticker}</b><small>${safe(r.name)}</small></span></button></td><td>${safe(r.industry)}<small>${r.complete?'Complete snowflake':'Partial / unavailable data'}</small></td>${AXES.map(a=>`<td class="snow-score">${r.axes[a].score===null?(r.axes[a].known?`<span title="${r.axes[a].known} of 5 checks available">≥${r.axes[a].passed}<small>/ 5 · partial</small></span>`:'<span class="subtle">N/A</span>'):r.axes[a].score+'<small>/ 5</small>'}</td>`).join('')}<td><button class="secondary" data-stock="${r.ticker}">Charts</button><small>${eligible.has(r.ticker)?SETUP_LABELS[stockMap[r.ticker]?.setup?.status]||SETUP_LABELS.unknown:'가격·매출 확인 대기'}</small></td></tr>`).join(''):`<tr><td colspan="8" class="empty-state">${timing!=='research'?'No confirmed timing matches. See the timing counts above; missing or stale prices cannot qualify.':groups.pending.length?'No confirmed matches yet. '+groups.pending.length+' stocks are awaiting enough data to evaluate your minimums.':'No stocks in the evaluated scope meet every minimum. Stocks with higher scores are included automatically.'}</td></tr>`;
 }
 function showDetail(ticker){const r=stocks.find(s=>s.ticker===ticker);if(!r)return;
  $('#snow-detail-title').textContent=ticker+' · '+r.name;
@@ -57,6 +64,7 @@ chart.addEventListener('pointerup',()=>drag=null);chart.addEventListener('pointe
 chart.addEventListener('keydown',e=>{const h=e.target.closest('[data-axis]');if(!h||!['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;e.preventDefault();const i=Number(h.dataset.axis),a=AXES[i];minimum[a]=e.key==='Home'?0:e.key==='End'?5:Math.max(0,Math.min(5,minimum[a]+(['ArrowUp','ArrowRight'].includes(e.key)?1:-1)));renderFilter();chart.querySelector(`[data-axis="${i}"]`).focus();renderResults();});
 $('#snow-refresh').onclick=()=>{opened=true;refresh();};
 $('#snow-detail-close').onclick=()=>$('#snow-detail').close();
+document.addEventListener('market-updated',renderResults);
 renderFilter();snapshot().catch(()=>status('Open the screener to collect fundamentals.'));
 new IntersectionObserver(entries=>{if(entries.some(e=>e.isIntersecting)&&!opened){opened=true;refresh();}},{threshold:.1}).observe(root);
 document.addEventListener('visibilitychange',()=>{clearTimeout(timer);if(!document.hidden&&opened)refresh();});

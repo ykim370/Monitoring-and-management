@@ -60,3 +60,14 @@ Collection now continues after an individual network/JSON timeout instead of abo
 
 ### Screener-first research
 The initial workflow is fundamental screening, opportunity/risk ranking, then chart inspection. Radar filters support relative ranks, strong signals (score ≥60 / ≤40), and confirmed directional breakouts. Search applies before ranking. Expand each row for signed score contributions; price dates and selectable ATR scenario percentages accompany every result. Missing or stale evidence is not ranked, and the universe remains 24 supported stocks. The / shortcut focuses the main screener.
+
+### 21-session uptrend pullback model (v1)
+The screener defaults to confirmed pullbacks and shares the same model as the opportunity/risk radar and stock inspector. Company-research mode remains available but is explicitly not a buy list. Indicators use existing split-adjusted daily OHLCV; no extra provider calls are made.
+
+Long-term mandatory gate: close > SMA200, SMA50 > SMA200, both averages above their values 21 sessions earlier, and positive 126-session return. At least 221 valid, increasing-date bars are required. Timing requires a 0.5–3 ATR pullback from the preceding 21-session highest close, distance to EMA20 between −0.75 and +0.75 ATR, close ≥ SMA50 − 0.5 ATR, and Wilder RSI14 between 40 and 60. Confirmation requires close above the previous high, increasing RSI14, and volume at least the preceding 20-session average. ATR is the existing 14-session mean of True Range.
+
+Default opportunity candidates pass every gate. Watch mode explicitly includes unconfirmed pullbacks; failed trend/support conditions appear as buy exclusions, not short recommendations. Unknown history never counts as bearish or eligible. The old composite score remains secondary and cannot bypass any gate. Freshness and same-date price/revenue coverage still apply. Empty results are valid; lists are never filled with ineligible stocks.
+
+The explorer shows SMA50/SMA200 and EMA20, an RSI chart with 40–60 reference band, exact check values, and a 1-year display option. Scenario controls are 5/10/21 sessions. These are research heuristics, not backtested optimum settings, profit probabilities, fundamental undervaluation estimates or automatic trade/exit instructions. Earnings dates, sector and broad-market conditions remain separate checks. Review trend/support daily during a maximum 21-session research horizon.
+
+Indicator reference: https://www.fidelity.com/learning-center/trading-investing/technical-analysis/technical-indicator-guide/RSI . The combination and numerical cutoffs are this project's own rules, not Fidelity recommendations.

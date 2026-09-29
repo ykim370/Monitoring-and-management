@@ -50,3 +50,10 @@ Screenshot used Value>=1, Future>=3, Past>=1, Health>=1, Dividend>=1 and complet
 - Query filtering occurs before ranking, so a single eligible matching stock is displayed. Lists remain disjoint; relative rank is explicitly distinguished from bearish evidence.
 - No additional provider requests or score/probability claims introduced. Universe remains the supported 24 stocks.
 - Added radar model tests and browser assertions for ordering, single matches, evidence and horizon controls.
+
+## 2026-09-30 (NZ): Long-term uptrend gate with short-term pullback timing
+- Added pure SMA, Wilder RSI14 and 21-session pullback model using existing 260-bar adjusted price history, with insufficient-history and invalid-input handling.
+- Required long-term trend gates across all radar opportunity modes; separated confirmed, unconfirmed, waiting, risk and unknown states. Kept legacy score for secondary context, without changing persisted historical score semantics.
+- Applied the same timing model to the fundamental screener, defaulting to confirmed pullbacks, and made company-research mode explicit.
+- Added EMA20/SMA50/SMA200 chart overlays, RSI panel, 1Y range and 5/10/21-session scenarios. Displayed the actual criteria and exclusions in both radar and inspector.
+- Validation: 63 unit tests; browser checks with explicit synthetic histories include a downtrending stock's short rally being rejected, confirmation and history gates, screener/radar consistency, evidence and charts, plus mobile/tablet overflow. No claim of strategy profitability or optimal parameters; live provider coverage is independent of this UI/model validation.
