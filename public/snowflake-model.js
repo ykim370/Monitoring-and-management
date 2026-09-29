@@ -28,9 +28,24 @@ export function snowflakeScores(data,now=Date.now()){
  const axes=Object.fromEntries(AXES.map(name=>{const rows=tests[name],known=rows.filter(r=>r.pass!==null).length,passed=rows.filter(r=>r.pass===true).length;return [name,{score:known===5?passed:null,known,passed,tests:rows}];}));
  return {axes,complete:AXES.every(k=>axes[k].score!==null),forecastPeriod:adjacent?`${a.date} to ${z.date}`:null};
 }
-export function filterSnowflakes(rows,{query='',industry='',minimum={},complete=false,sort='ticker'}={}){
- const terms=query.trim().toLowerCase().split(/\s+/).filter(Boolean);
- const result=rows.filter(r=>terms.every(t=>[r.ticker,r.name,r.industry,r.description].join(' ').toLowerCase().includes(t))&&(!industry||r.industry===industry)&&(!complete||r.complete)&&AXES.every(a=>!(minimum[a]>0)||(r.axes[a].score!==null&&r.axes[a].score>=minimum[a])));
- const metric=r=>sort==='marketCap'?r.marketCap:AXES.includes(sort)?r.axes[sort].score:null;
- return result.sort((a,b)=>sort==='ticker'?a.ticker.localeCompare(b.ticker):(metric(b)??-Infinity)-(metric(a)??-Infinity)||a.ticker.localeCompare(b.ticker));
+export function assessSnowflake(row,{minimum={},complete=false}={}){
+ const pending=[];const failed=[];
+ for(const a of AXES){
+  const axis=row.axes[a],target=Number(minimum[a]||0);if(target<=0)continue;
+  const lower=axis.score??axis.passed??0,upper=axis.score??(lower+5-(axis.known??0));
+  if(upper<target)failed.push(a);else if(lower<target)pending.push(a);
+ }
+ if(failed.length)return {state:'below',axes:failed};
+ if(complete&&!row.complete)for(const a of AXES)if(row.axes[a].score===null&&!pending.includes(a))pending.push(a);
+ return {state:pending.length?'pending':'match',axes:pending};
 }
+export function screenSnowflakes(rows,{query='',industry='',minimum={},complete=false,sort='ticker'}={}){
+ const terms=query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+ const scope=rows.filter(r=>terms.every(t=>[r.ticker,r.name,r.industry,r.description].join(' ').toLowerCase().includes(t))&&(!industry||r.industry===industry));
+ const groups={matches:[],pending:[],below:[]};
+ for(const row of scope){const result=assessSnowflake(row,{minimum,complete});groups[result.state==='match'?'matches':result.state].push({...row,filterAssessment:result});}
+ const metric=r=>sort==='marketCap'?r.marketCap:AXES.includes(sort)?r.axes[sort].score??r.axes[sort].passed??null:null;
+ groups.matches.sort((a,b)=>sort==='ticker'?a.ticker.localeCompare(b.ticker):(metric(b)??-Infinity)-(metric(a)??-Infinity)||a.ticker.localeCompare(b.ticker));
+ return groups;
+}
+export function filterSnowflakes(rows,options={}){return screenSnowflakes(rows,options).matches;}

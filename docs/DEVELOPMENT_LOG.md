@@ -40,3 +40,6 @@ Added a D1-backed rolling 70/minute reservation budget shared by all market endp
 
 ### Fundamental snowflake screener (2026-09-29 NZ)
 User selected the current 24 stocks and Value/Future/Past/Health/Dividend axes. Added independently specified, inspectable 0–5 scoring; overview/annual balance/annual cash-flow endpoints through existing persistent cache and shared budget; EPS estimate metadata; a stored-data screener API; interactive radar filters, search, industry/sort, presets, evidence modal and chart links. New data remains unavailable until Alpha Vantage returns it; production never imports test fixtures.
+
+### Snowflake minimum-filter diagnosis and recovery (2026-09-30 NZ)
+Screenshot used Value>=1, Future>=3, Past>=1, Health>=1, Dividend>=1 and complete-only. Live feed had zero complete stocks, but UI incorrectly described this as no qualifying stocks. Added separate pending/below/match states and visible AND/>= summary, mathematically justified partial-score lower bounds, per-request failure recovery, cursor rotation, backoff-aware tasks and fundamental collection priority. Added regression tests for the exact thresholds (equal/better accepted), strict complete-only and timeout/cooldown recovery. Provider throttling remains separately diagnosed from filtering; no scores or matches are fabricated.

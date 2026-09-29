@@ -66,6 +66,7 @@ async function provider(fn,ticker,env,context){
  }
 }
 export async function handleApi(request,env={},context={}){
+  env={...env,ALPHAVANTAGE_API_KEY:typeof env.ALPHAVANTAGE_API_KEY==='string'?env.ALPHAVANTAGE_API_KEY.trim():''};
   try{
     const url=new URL(request.url);if(['/api/import-preview','/api/holdings-import'].includes(url.pathname))return holdingsImport(request,env,context);if(url.pathname==='/api/journal-outcomes')return journalOutcomes(request,env,context);if(url.pathname==='/api/alerts')return alertsApi(request,env,context);if(url.pathname==='/api/records')return recordsApi(request,env,context);if(request.method!=='GET')return json({error:{code:'METHOD_NOT_ALLOWED',message:'Read-only API. Use GET.'}},405);
     if(url.pathname==='/api/calendar')return json(await calendarData(env,{...context,run:task=>queuedFetch(task,Math.max(1000,Number(env.ALPHAVANTAGE_MIN_INTERVAL_MS)||2000))}));
