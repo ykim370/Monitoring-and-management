@@ -8,7 +8,7 @@ export async function renderHealth(){
   if(!data.available)throw Error('unavailable');
   status.textContent='Durable last-known data · timestamps in New Zealand time · fresh data is reused across visits';
   const budget=data.budget;document.querySelector('#api-budget').textContent=budget?`Shared API budget: ${budget.used} / ${budget.limit} request slots used in the last 60 seconds · ${budget.remaining} available${budget.cooldownUntil>Date.now()?' · Provider cooldown active':''}`:'API budget status unavailable';
-  const kinds=[['TIME_SERIES_DAILY_ADJUSTED','Prices'],['INCOME_STATEMENT','Revenue'],['EARNINGS_ESTIMATES','Analyst estimates (on demand)']];
+  const kinds=[['TIME_SERIES_DAILY_ADJUSTED','Prices'],['INCOME_STATEMENT','Revenue'],['EARNINGS_ESTIMATES','Analyst estimates'],['OVERVIEW','Company overview'],['BALANCE_SHEET','Annual balance sheet'],['CASH_FLOW','Annual cash flow']];
   body.innerHTML=universe.flatMap(stock=>kinds.map(([kind,label])=>{
    const row=data.records.find(r=>r.ticker===stock.ticker&&r.kind===kind);
    const job=data.budget?.jobs?.find(j=>j.key===kind+':'+stock.ticker);

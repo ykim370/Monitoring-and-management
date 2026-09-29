@@ -37,3 +37,6 @@ Implemented and pushed in order: health/persistence, portfolio risk, daily chang
 
 ### Shared budget and circulating refresh (2026-09-29 NZ)
 Added a D1-backed rolling 70/minute reservation budget shared by all market endpoints and Worker instances, crash-expiring per-source leases, global provider cooldown, bounded retries and exponential source backoff. Added visible budget/retry status and automatic visible-tab refresh, missing/overdue-first ordering, two loading lanes and a pause control. Existing stored data remains authoritative across visits. Clarified unrequested estimates and non-price date labels. Added migration 0005 and budget/concurrency/cache/rotation tests; no API key or market payload committed. Includes the previously completed Priorities 2–8 in the next private publication.
+
+### Fundamental snowflake screener (2026-09-29 NZ)
+User selected the current 24 stocks and Value/Future/Past/Health/Dividend axes. Added independently specified, inspectable 0–5 scoring; overview/annual balance/annual cash-flow endpoints through existing persistent cache and shared budget; EPS estimate metadata; a stored-data screener API; interactive radar filters, search, industry/sort, presets, evidence modal and chart links. New data remains unavailable until Alpha Vantage returns it; production never imports test fixtures.

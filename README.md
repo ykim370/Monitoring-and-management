@@ -86,3 +86,6 @@ See [FEATURES.md](docs/FEATURES.md) for the health panel, risk overview, change 
 
 ### API budget and refresh
 The hosted dashboard now shares a durable 70-request rolling-minute budget across prices, revenue, estimates and earnings calendar. It caches responses, prevents duplicate concurrent fetches, backs off after failures, and rotates the watchlist every 60 seconds after the previous cycle finishes while the tab is visible. Prices are daily data (one-hour cache); fundamentals/calendar use six-hour caches. Fresh reads do not spend provider calls. See `docs/FEATURES.md` for timing, recovery behaviour and the limitation when another project uses the same key.
+
+### Snowflake screener
+Open **Snowflake screener** in the sidebar to screen the 24 supported stocks by Value, Future, Past, Health and Dividend. Drag the chart handles or use the sliders, then click a company to inspect every check. This is an independently defined 0–5 fundamental model, not a return forecast or a replica of another service's scores. Fresh fundamentals are collected gradually under the shared API budget; unavailable axes are explicitly marked N/A. Full rules and data limitations are in `docs/FEATURES.md`.

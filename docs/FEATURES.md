@@ -31,3 +31,23 @@ Run `npm test`, `npm run test:browser`, `node tests/features-browser.cjs`, and `
 - This is a page-driven refresh loop, not a background service when all tabs are closed. Reopening resumes from persisted data and shared retry state. Multiple tabs share the budget and data.
 - The limiter covers this Site only. Other projects using the same API key are not observable; five calls of headroom cannot guarantee spare capacity for them. Provider notices always take precedence over the configured plan allowance.
 - Tests use fixture payloads: concurrent reservation races, rolling-window exhaustion/recovery, per-source leases, exponential backoff, global cooldown, crash recovery, storage outage, cached data after memory reset, rotation ordering and browser timer/pause behaviour.
+
+## Snowflake screener (current 24-stock universe)
+
+A five-axis fundamental screener, independently defined by Swing Desk. The reference screenshots informed the interaction; scores do not reproduce Simply Wall St's proprietary methodology and are not return probabilities, fair-value estimates or trading instructions.
+
+Each axis has five fixed binary checks, one point per pass. It is N/A unless all five checks can be evaluated; missing/stale inputs never become zero or a passing value. A confirmed zero dividend yield produces Dividend 0/5. Filters combine minimums with AND; a zero minimum disables that axis filter. Unknown axes cannot satisfy active thresholds. Partial shapes show available points without an invented closed polygon.
+
+- **Value:** positive P/E <25, forward P/E <25, PEG <1.5, price/book <3, EV/EBITDA <15. These are fixed, non-sector-adjusted thresholds, not intrinsic valuations.
+- **Future:** forecast revenue growth >0%, >=10%, >=20%; forecast EPS growth >0%, >=10%. Uses the earliest two consecutive future fiscal-year consensus estimates (300–430 days apart), positive base values and positive analyst counts. It does not compare unlike annual/quarterly periods or turn loss-to-profit changes into misleading percentages.
+- **Past:** positive quarterly revenue YoY growth; positive quarterly earnings YoY growth; positive profit margin; margin >=10%; ROE >=15%.
+- **Health:** current ratio >=1 and >=1.5; liabilities/assets between 0 and 0.5; positive shareholder equity; positive annual operating cash flow.
+- **Dividend:** positive yield; yield >=2%; nonnegative DPS/EPS payout <=60%; positive annual free cash flow; free cash flow covers positive annual common dividends. Free cash flow is operating cash flow minus absolute capital expenditures. Annual cash-flow checks are not a promise of dividend sustainability.
+
+Sources: Alpha Vantage OVERVIEW, BALANCE_SHEET, CASH_FLOW and EARNINGS_ESTIMATES. Overview/estimates use six-hour caches; statements use 24-hour caches. The existing shared 70/minute budget and leases cover every endpoint. Latest-quarter overview data older than 200 days and annual reports older than 550 days cannot contribute to scores. The modal exposes source retrieval timestamps, fiscal dates, raw ratio inputs, failed checks and availability.
+
+The screener reads saved data first and begins filling missing/expired sources when opened. It collects one source at a time, stops a cycle at provider/budget throttling, and retries after 60 seconds while visible, subject to shared per-source backoff. Initial collection can take several minutes or longer during provider throttling. No extra database migration is required: the existing market_cache stores normalized fundamentals. Old estimate packets without the new EPS fields are refreshed through the normal budget.
+
+UI: pointer/keyboard snowflake handles, accessible range sliders, keyword/company/ticker search, industry selector, axis/market-cap sorting, three presets, reset, complete-only filter, per-company evidence and trading-chart links. Scope is the existing 24 US-listed stocks; it is not an all-market search. Keywords search actual available company descriptions; no invented thematic tags are added.
+
+Verification: fixture-based scoring, missing-data semantics, stale/aged inputs, invalid forecast bases/periods, combined filters, normalization, cache/budget integration; browser search, sliders, pointer/keyboard controls, presets, evidence and 390/768px overflow checks. Test fixtures are not used in the production dashboard.

@@ -40,5 +40,5 @@ export function normalizeRevenue(payload){
 export function normalizeEstimates(payload){
   validateProviderResponse(payload);
   if(!Array.isArray(payload.estimates))throw new DataError('NO_ESTIMATES','Analyst consensus is unavailable.');
-  return payload.estimates.filter(r=>/^\d{4}-\d{2}-\d{2}$/.test(r.date)&&['fiscal year','fiscal quarter'].includes(r.horizon)).map(r=>({date:r.date,horizon:r.horizon,revenueAverage:num(r.revenue_estimate_average),revenueLow:num(r.revenue_estimate_low),revenueHigh:num(r.revenue_estimate_high),analystCount:num(r.revenue_estimate_analyst_count),epsHistory:[90,60,30,7,0].map(d=>({daysAgo:d,value:num(d?r['eps_estimate_average_'+d+'_days_ago']:r.eps_estimate_average)}))}));
+  return payload.estimates.filter(r=>/^\d{4}-\d{2}-\d{2}$/.test(r.date)&&['fiscal year','fiscal quarter'].includes(r.horizon)).map(r=>({date:r.date,horizon:r.horizon,revenueAverage:num(r.revenue_estimate_average),revenueLow:num(r.revenue_estimate_low),revenueHigh:num(r.revenue_estimate_high),analystCount:num(r.revenue_estimate_analyst_count),epsAverage:num(r.eps_estimate_average),epsAnalystCount:num(r.eps_estimate_analyst_count),epsHistory:[90,60,30,7,0].map(d=>({daysAgo:d,value:num(d?r['eps_estimate_average_'+d+'_days_ago']:r.eps_estimate_average)}))}));
 }
