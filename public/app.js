@@ -64,7 +64,7 @@ function fundamentalChart(s,type){
  renderBars(s.revenue,`${s.revenue.at(-1).currency} 백만 · 분기말 기준 실제 보고 매출`);
  $('#chart-description').innerHTML=`<b>전년 동기 ${pct(s.revGrowth)}</b> · ${s.revContinuous?'3분기 연속 전분기 대비 증가':'연속 증가 조건 미충족 / 데이터 부족'} · 최근 분기 ${s.revenue.at(-1).date}`;
 }
-function renderExplorer(){const s=stockMap[selected];$('#stock-select').value=selected;$('#explorer-logo').textContent=selected[0];
+function renderExplorer(){const s=stockMap[selected];$('#stock-select').value=selected;syncStockLookup();$('#explorer-logo').textContent=selected[0];
  $$('[data-chart]').forEach(b=>{b.classList.toggle('selected',b.dataset.chart===chartTab);b.setAttribute('aria-selected',b.dataset.chart===chartTab);});
  if(!s){$('#selected-name').textContent=universe.find(x=>x.ticker===selected)?.name||selected;$('#selected-price').textContent='—';$('#selected-change').textContent='실제 데이터 대기';$('#insights').innerHTML='<div class="empty-state">실제 OHLCV를 수신하면 신호가 계산됩니다.</div>';$('#main-chart').innerHTML='<div class="empty-state">'+(loadErrors[selected]?'시세를 불러오지 못했습니다. 새로고침으로 재시도하세요.':'Alpha Vantage 가격 데이터를 불러오는 중…')+'</div>';$('#chart-description').textContent='샘플 데이터로 대체하지 않습니다.';return;}
  $('#selected-name').textContent=s.name+' · '+s.sector;$('#selected-price').textContent=money(s.price);$('#selected-change').className=cls(s.change);$('#selected-change').textContent=pct(s.change)+' · '+s.asOf+' 종가'+(isPriceStale(s)?' · 오래된 데이터':'');$('#chart-options').style.display=chartTab==='price'?'flex':'none';$('#chart-ranges').style.display=chartTab==='price'?'flex':'none';renderInsights(s);chartTab==='price'?priceChart(s):fundamentalChart(s,chartTab);
@@ -85,6 +85,41 @@ function holdingRows(items){$('#holding-inputs').innerHTML='<div class="holding-
 function readDraft(){return $$('.holding-input-row').map(row=>({ticker:row.querySelector('select').value,qty:Number(row.querySelectorAll('input')[0].value),avg:Number(row.querySelectorAll('input')[1].value)}));}
 $('#stock-select').innerHTML=universe.map(s=>`<option value="${s.ticker}">${s.ticker}</option>`).join('');
 $('#stock-select').addEventListener('change',e=>{selected=e.target.value;renderExplorer();});
+
+function stockLookupMatches(query){
+ const q=query.trim().toLocaleLowerCase();
+ if(!q)return [];
+ const exact=universe.filter(s=>[s.ticker,s.name,s.ticker+' — '+s.name].some(v=>v.toLocaleLowerCase()===q));
+ return exact.length?exact:universe.filter(s=>(s.ticker+' '+s.name).toLocaleLowerCase().includes(q));
+}
+function syncStockLookup(){
+ const input=$('#stock-lookup'),meta=universe.find(s=>s.ticker===selected);
+ if(input&&meta&&document.activeElement!==input){
+  input.value=meta.ticker+' — '+meta.name;
+  $('#stock-lookup-message').textContent='';
+ }
+}
+function setupStockLookup(){
+ const select=$('#stock-select'),host=document.createElement('div');
+ host.style.cssText='display:flex;flex-direction:column;gap:6px;max-width:100%;margin-bottom:8px';
+ const label=document.createElement('label');label.htmlFor='stock-lookup';label.textContent='티커 또는 회사명';label.style.cssText='font-size:14px;color:var(--muted)';
+ const input=document.createElement('input');input.id='stock-lookup';input.type='search';input.autocomplete='off';input.spellcheck=false;input.placeholder='NVDA 또는 NVIDIA';input.setAttribute('list','stock-lookup-options');input.setAttribute('aria-describedby','stock-lookup-message');
+ input.style.cssText='box-sizing:border-box;width:clamp(130px,18vw,230px);max-width:100%;min-height:40px;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--panel);color:var(--text);font-size:14px';
+ const options=document.createElement('datalist');options.id='stock-lookup-options';
+ for(const meta of universe){const option=document.createElement('option');option.value=meta.ticker+' — '+meta.name;options.append(option);}
+ const message=document.createElement('small');message.id='stock-lookup-message';message.setAttribute('role','status');message.style.cssText='font-size:12px;max-width:230px;white-space:normal;color:var(--muted)';
+ host.append(label,input,options,message);select.before(host);
+ select.setAttribute('aria-label','지원 종목 목록');
+ const restore=()=>{const meta=universe.find(s=>s.ticker===selected);input.value=meta.ticker+' — '+meta.name;message.textContent='';};
+ const commit=()=>{const matches=stockLookupMatches(input.value);if(matches.length===1){selected=matches[0].ticker;chartTab='price';renderExplorer();restore();}else message.textContent=matches.length?'여러 종목이 일치합니다. 목록에서 선택하세요.':'지원하는 24개 종목에서 찾을 수 없습니다. 티커나 회사명을 확인하세요.';};
+ input.addEventListener('focus',()=>input.select());
+ input.addEventListener('input',()=>{message.textContent='';});
+ input.addEventListener('change',commit);
+ input.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();commit();}if(event.key==='Escape'){event.preventDefault();restore();input.blur();}});
+ syncStockLookup();
+}
+setupStockLookup();
+
 $('#horizon').addEventListener('change',e=>{days=Number(e.target.value);renderHoldings();renderExplorer();});
 $('#stock-search').addEventListener('input',renderWatch);
 $('#radar-signal').addEventListener('change',renderWatch);
