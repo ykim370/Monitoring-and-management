@@ -57,3 +57,10 @@ Screenshot used Value>=1, Future>=3, Past>=1, Health>=1, Dividend>=1 and complet
 - Applied the same timing model to the fundamental screener, defaulting to confirmed pullbacks, and made company-research mode explicit.
 - Added EMA20/SMA50/SMA200 chart overlays, RSI panel, 1Y range and 5/10/21-session scenarios. Displayed the actual criteria and exclusions in both radar and inspector.
 - Validation: 63 unit tests; browser checks with explicit synthetic histories include a downtrending stock's short rally being rejected, confirmation and history gates, screener/radar consistency, evidence and charts, plus mobile/tablet overflow. No claim of strategy profitability or optimal parameters; live provider coverage is independent of this UI/model validation.
+
+## 2026-09-30 (NZ): Live Capital.com read-only account integration
+- Verified supplied credentials against the live broker, matched the requested account, and verified the new adapter on both initial authentication and subsequent session reuse. No orders or account changes were submitted.
+- Added owner-authorized /api/capital with strict upstream endpoint/method allowlist, configured-account verification, private 30-second coalescing, timeout/redirect rejection and sanitized failures with backoff.
+- Added separate broker-account panel, retained manual research holdings and preserved CFD quantities/directions/currencies without assuming share ownership or instrument mapping.
+- Credentials configured only as private runtime secrets; source and fixtures contain no real credentials or broker balances/positions.
+- Validation: 68 unit tests and a dedicated browser fixture covering short positions, missing fields, stale-on-error values, no trading controls and mobile/tablet layouts. Live adapter successfully read the configured account twice.
