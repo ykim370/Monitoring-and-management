@@ -14,3 +14,12 @@ test('durable last-known data survives process cache reset; failed refresh prese
  }finally{db.close();resetApiState();}
 });
 test('first failure remains missing, with no invented last-known data',async()=>{const db=localDatabase(':memory:');try{const r=await handleApi(request('/api/prices?symbol=AVGO'),{DB:db});assert.equal(r.status,503);const h=await(await handleApi(request('/api/health'),{DB:db})).json();assert.equal(h.records[0].succeeded_at,null);}finally{db.close();}});
+test('old-session cache expires after five minutes even with legacy one-hour expiry',async()=>{
+ const db=localDatabase(':memory:'),env={DB:db,ALPHAVANTAGE_API_KEY:'fixture-key'};resetApiState();let calls=0;
+ try{const context={fetcher:async()=>{calls++;return Response.json(priceFixture());}};
+ await handleApi(request('/api/prices?symbol=AVGO'),env,context);
+ const row=await db.prepare('SELECT * FROM market_cache').first(),packet=JSON.parse(row.payload);packet.fetchedAt=new Date(Date.now()-6*60000).toISOString();
+ await db.prepare('UPDATE market_cache SET payload=?,expires=?').bind(JSON.stringify(packet),Date.now()+54*60000).run();resetApiState();
+ const result=await(await handleApi(request('/api/prices?symbol=AVGO'),env,context)).json();assert.equal(calls,2);assert.equal(result.behindLatestSession,true);assert.ok(result.expectedSession>result.value.asOf);
+ }finally{db.close();resetApiState();}
+});

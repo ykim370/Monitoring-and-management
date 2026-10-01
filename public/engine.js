@@ -1,3 +1,4 @@
+import {priceBehind} from './market-session.js';
 import {pullbackSetup} from './pullback-model.js';
 // Pure signal calculations. No API credentials, requests, or generated market prices.
 export const universe = [
@@ -171,7 +172,7 @@ export function analyzeStock(input) {
   return {...input,setup:pullbackSetup(bars),price,e20,e50,atr,pattern,revenue,guidance:[],revGrowth,revContinuous,guideChange:null,guideContinuous:null,parts,score,ret20,change:(price/closes.at(-2)-1)*100,coverage:parts.revenue===null?70:86};
 }
 export function installStock(input){const s=analyzeStock(input);stockMap[s.ticker]=s;const i=stocks.findIndex(x=>x.ticker===s.ticker);if(i<0)stocks.push(s);else stocks[i]=s;return s;}
-export function isPriceStale(s,now=Date.now()){return !s.asOf||(now-Date.parse(s.asOf+'T23:59:59Z'))/86400000>MAX_PRICE_AGE_DAYS;}
+export function isPriceStale(s,now=Date.now()){return priceBehind(s.asOf,now);}
 export function rankedUniverse(now=Date.now()){
   const latest=stocks.reduce((d,s)=>s.asOf>d?s.asOf:d,'');
   return stocks.filter(s=>s.asOf===latest&&!s.transportStale&&!isPriceStale(s,now)&&s.parts.revenue!==null);

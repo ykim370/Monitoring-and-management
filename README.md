@@ -89,3 +89,11 @@ The hosted dashboard now shares a durable 70-request rolling-minute budget acros
 
 ### Snowflake screener
 Open **Snowflake screener** in the sidebar to screen the 24 supported stocks by Value, Future, Past, Health and Dividend. Drag the chart handles or use the sliders, then click a company to inspect every check. This is an independently defined 0–5 fundamental model, not a return forecast or a replica of another service's scores. Fresh fundamentals are collected gradually under the shared API budget; unavailable axes are explicitly marked N/A. Full rules and data limitations are in `docs/FEATURES.md`.
+
+### Nasdaq explorer search
+The explorer searches the full Nasdaq Trader listed-securities directory (including ETFs and other listed security types, excluding test issues), plus the existing watchlist. Search by ticker or English company name, then select a result to load its daily price history and financial data. Provider coverage varies; unavailable data remains explicit. The automatic screener/radar and holdings workflow still use their existing 24-stock watchlist; the explorer does not request prices for the entire exchange.
+
+`/api/symbols?q=tesla` reads the official directory, cached for six hours. A dated full-directory snapshot in `src/data/nasdaq.json` is used if the upstream directory is unavailable; search results disclose this fallback and its date. The snapshot was retrieved from https://www.nasdaqtrader.com/dynamic/SymDir/nasdaqlisted.txt (file creation time 2026-09-30 18:01). Search does not consume Alpha Vantage requests; selected-stock data uses the existing server cache and shared provider budget.
+
+### Daily-price freshness
+US stock dates are New York session dates, not New Zealand calendar dates. The dashboard compares prices with the latest completed regular US session (scheduled holidays and DST included; exceptional closures and early closes are not inferred). A behind-session result is rechecked after five minutes across durable, edge and memory caches, subject to the shared provider budget/backoff. It remains visibly dated and excluded from current opportunity rankings. Price collection runs before revenue; analyst estimates refresh on demand instead of being re-requested every rotation. API throttling can still prevent current data; stored data is never relabelled as a new close.

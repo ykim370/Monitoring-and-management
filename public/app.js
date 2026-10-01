@@ -1,3 +1,5 @@
+import {latestCompletedSession} from './market-session.js';
+import {setupStockLookup} from './stock-lookup.js';
 import {SETUP_LABELS} from './pullback-model.js';
 import {setupEvidence} from './pullback-view.js';
 import {radarLists} from './radar-model.js';
@@ -8,13 +10,15 @@ import {setCalendarHoldings} from './calendar.js';
 import {renderChanges} from './changes.js';
 import {renderRisk} from './risk.js';
 import {renderHealth} from './health.js';
-import {stocks,stockMap,rankStocks,scenario,defaultHoldings,portfolio,validateHoldings,universe,installStock,rankedUniverse,isPriceStale} from './engine.js';
+import {stocks,stockMap,rankStocks,scenario,defaultHoldings,portfolio,validateHoldings,universe,installStock,analyzeStock,rankedUniverse,isPriceStale} from './engine.js';
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const money=(v,d=2)=>!Number.isFinite(v)?'—':'$'+v.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
 const pct=v=>!Number.isFinite(v)?'N/A':(v>=0?'+':'')+v.toFixed(1)+'%';
 const cls=v=>v>=0?'positive':'negative';
 const scoreClass=s=>s>=60?'positive':s<=40?'negative':'neutral';
 const colors=['#c0ec8b','#b2a1df','#72cbd3','#eea39d'];
+const explorerMeta=new Map(universe.map(s=>[s.ticker,s])),explorerPending=new Map();
+let stockLookup;
 const packets={},loadErrors={},estimateCache={},estimatePending=new Set();let loading=false,finished=0;
 let selected='AVGO',days=21,chartTab='price',range=120,compare=['AVGO','TTMI'],holdings=structuredClone(defaultHoldings),toastTimer;
 
@@ -64,10 +68,10 @@ function fundamentalChart(s,type){
  renderBars(s.revenue,`${s.revenue.at(-1).currency} 백만 · 분기말 기준 실제 보고 매출`);
  $('#chart-description').innerHTML=`<b>전년 동기 ${pct(s.revGrowth)}</b> · ${s.revContinuous?'3분기 연속 전분기 대비 증가':'연속 증가 조건 미충족 / 데이터 부족'} · 최근 분기 ${s.revenue.at(-1).date}`;
 }
-function renderExplorer(){const s=stockMap[selected];$('#stock-select').value=selected;syncStockLookup();$('#explorer-logo').textContent=selected[0];
+function renderExplorer(){const s=stockMap[selected];$('#stock-select').value=selected;stockLookup?.sync();$('#explorer-logo').textContent=selected[0];
  $$('[data-chart]').forEach(b=>{b.classList.toggle('selected',b.dataset.chart===chartTab);b.setAttribute('aria-selected',b.dataset.chart===chartTab);});
- if(!s){$('#selected-name').textContent=universe.find(x=>x.ticker===selected)?.name||selected;$('#selected-price').textContent='—';$('#selected-change').textContent='실제 데이터 대기';$('#insights').innerHTML='<div class="empty-state">실제 OHLCV를 수신하면 신호가 계산됩니다.</div>';$('#main-chart').innerHTML='<div class="empty-state">'+(loadErrors[selected]?'시세를 불러오지 못했습니다. 새로고침으로 재시도하세요.':'Alpha Vantage 가격 데이터를 불러오는 중…')+'</div>';$('#chart-description').textContent='샘플 데이터로 대체하지 않습니다.';return;}
- $('#selected-name').textContent=s.name+' · '+s.sector;$('#selected-price').textContent=money(s.price);$('#selected-change').className=cls(s.change);$('#selected-change').textContent=pct(s.change)+' · '+s.asOf+' 종가'+(isPriceStale(s)?' · 오래된 데이터':'');$('#chart-options').style.display=chartTab==='price'?'flex':'none';$('#chart-ranges').style.display=chartTab==='price'?'flex':'none';renderInsights(s);chartTab==='price'?priceChart(s):fundamentalChart(s,chartTab);
+ if(!s){$('#selected-name').textContent=explorerMeta.get(selected)?.name||selected;$('#selected-price').textContent='—';$('#selected-change').textContent='실제 데이터 대기';$('#insights').innerHTML='<div class="empty-state">실제 OHLCV를 수신하면 신호가 계산됩니다.</div>';$('#main-chart').innerHTML='<div class="empty-state">'+(loadErrors[selected]?'시세를 불러오지 못했습니다. 새로고침으로 재시도하세요.':'Alpha Vantage 가격 데이터를 불러오는 중…')+'</div>';$('#chart-description').textContent='샘플 데이터로 대체하지 않습니다.';return;}
+ $('#selected-name').textContent=s.name+' · '+s.sector;$('#selected-price').textContent=money(s.price);$('#selected-change').className=cls(s.change);$('#selected-change').textContent=pct(s.change)+' · '+s.asOf+' 미국 종가 · '+(isPriceStale(s)?'최신 마감 '+latestCompletedSession()+' 수신 대기':s.transportStale?'저장된 데이터 · 재시도 대기':'최신 마감일 일치');$('#chart-options').style.display=chartTab==='price'?'flex':'none';$('#chart-ranges').style.display=chartTab==='price'?'flex':'none';renderInsights(s);chartTab==='price'?priceChart(s):fundamentalChart(s,chartTab);
 }
 function choose(t){selected=t;chartTab='price';renderExplorer();$('#explorer').scrollIntoView({behavior:'smooth',block:'start'});}
 function updateCompare(){ $('#compare-count').textContent=compare.length;renderWatch();if($('#compare-dialog').open)renderCompare();}
@@ -86,39 +90,15 @@ function readDraft(){return $$('.holding-input-row').map(row=>({ticker:row.query
 $('#stock-select').innerHTML=universe.map(s=>`<option value="${s.ticker}">${s.ticker}</option>`).join('');
 $('#stock-select').addEventListener('change',e=>{selected=e.target.value;renderExplorer();});
 
-function stockLookupMatches(query){
- const q=query.trim().toLocaleLowerCase();
- if(!q)return [];
- const exact=universe.filter(s=>[s.ticker,s.name,s.ticker+' — '+s.name].some(v=>v.toLocaleLowerCase()===q));
- return exact.length?exact:universe.filter(s=>(s.ticker+' '+s.name).toLocaleLowerCase().includes(q));
+stockLookup=setupStockLookup({universe,getSelected:()=>explorerMeta.get(selected),onSelect:meta=>{
+ explorerMeta.set(meta.ticker,meta);selected=meta.ticker;chartTab='price';renderExplorer();
+ if(!stockMap[meta.ticker]||loadErrors[meta.ticker])loadExplorer(meta);
+}});
+function loadExplorer(meta){
+ if(explorerPending.has(meta.ticker))return explorerPending.get(meta.ticker);
+ delete loadErrors[meta.ticker];
+ const work=loadOne(meta,false).finally(()=>explorerPending.delete(meta.ticker));explorerPending.set(meta.ticker,work);return work;
 }
-function syncStockLookup(){
- const input=$('#stock-lookup'),meta=universe.find(s=>s.ticker===selected);
- if(input&&meta&&document.activeElement!==input){
-  input.value=meta.ticker+' — '+meta.name;
-  $('#stock-lookup-message').textContent='';
- }
-}
-function setupStockLookup(){
- const select=$('#stock-select'),host=document.createElement('div');
- host.style.cssText='display:flex;flex-direction:column;gap:6px;max-width:100%;margin-bottom:8px';
- const label=document.createElement('label');label.htmlFor='stock-lookup';label.textContent='티커 또는 회사명';label.style.cssText='font-size:14px;color:var(--muted)';
- const input=document.createElement('input');input.id='stock-lookup';input.type='search';input.autocomplete='off';input.spellcheck=false;input.placeholder='NVDA 또는 NVIDIA';input.setAttribute('list','stock-lookup-options');input.setAttribute('aria-describedby','stock-lookup-message');
- input.style.cssText='box-sizing:border-box;width:clamp(130px,18vw,230px);max-width:100%;min-height:40px;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--panel);color:var(--text);font-size:14px';
- const options=document.createElement('datalist');options.id='stock-lookup-options';
- for(const meta of universe){const option=document.createElement('option');option.value=meta.ticker+' — '+meta.name;options.append(option);}
- const message=document.createElement('small');message.id='stock-lookup-message';message.setAttribute('role','status');message.style.cssText='font-size:12px;max-width:230px;white-space:normal;color:var(--muted)';
- host.append(label,input,options,message);select.before(host);
- select.setAttribute('aria-label','지원 종목 목록');
- const restore=()=>{const meta=universe.find(s=>s.ticker===selected);input.value=meta.ticker+' — '+meta.name;message.textContent='';};
- const commit=()=>{const matches=stockLookupMatches(input.value);if(matches.length===1){selected=matches[0].ticker;chartTab='price';renderExplorer();restore();}else message.textContent=matches.length?'여러 종목이 일치합니다. 목록에서 선택하세요.':'지원하는 24개 종목에서 찾을 수 없습니다. 티커나 회사명을 확인하세요.';};
- input.addEventListener('focus',()=>input.select());
- input.addEventListener('input',()=>{message.textContent='';});
- input.addEventListener('change',commit);
- input.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();commit();}if(event.key==='Escape'){event.preventDefault();restore();input.blur();}});
- syncStockLookup();
-}
-setupStockLookup();
 
 $('#horizon').addEventListener('change',e=>{days=Number(e.target.value);renderHoldings();renderExplorer();});
 $('#stock-search').addEventListener('input',renderWatch);
@@ -145,8 +125,10 @@ async function getJson(url){for(;;){const response=await fetch(url,{cache:'no-st
 
 function updateStatus(){const valid=rankedUniverse().length,dates=[...new Set(stocks.map(s=>s.asOf))].sort(),failed=Object.keys(loadErrors).length;$('#data-status').textContent=rateRetryAt>Date.now()?'Alpha Vantage 요청 제한 · 잠시 후 자동 재시도':loading?`실제 데이터 수신 중 · ${finished}/24 종목 처리 · 순위 가능 ${valid}개`:`Alpha Vantage · 가격 ${stocks.length}/24 · 순위 가능 ${valid}/24${failed?' · '+failed+'개 수신 오류':''}`;$('#as-of-label').textContent=dates.length?(dates.length===1?dates[0]:dates[0]+' ~ '+dates.at(-1)):'수신 대기';$('#watch-coverage').textContent=`실제 종가·매출 수신 ${valid}/24 · 동일 기준일 순위 · 실시간 아님`;$('#refresh-data').disabled=loading;$('#refresh-data').textContent=loading?'불러오는 중…':'↻ 데이터 새로고침';$('#load-errors').textContent=failed?'재시도 대상: '+Object.keys(loadErrors).join(', ')+'. '+Object.values(loadErrors)[0]:'';}
 function repaintData(){renderHoldings();renderWatch();renderExplorer();updateStatus();document.dispatchEvent(new Event('market-updated'));}
-async function loadOne(meta){const ticker=meta.ticker;try{const price=await getJson('/api/prices?symbol='+ticker);packets[ticker]={...meta,...price.value,revenue:[],transportStale:!!price.stale,source:price.source,fetchedAt:price.fetchedAt};if(price.stale)loadErrors[ticker]="Last-known price: "+price.warning.message;installStock(packets[ticker]);repaintData();try{const report=await getJson('/api/revenue?symbol='+ticker);packets[ticker].revenue=report.value;packets[ticker].transportStale ||= !!report.stale;if(report.stale)loadErrors[ticker]="Last-known revenue: "+report.warning.message;packets[ticker].revenueFetchedAt=report.fetchedAt;installStock(packets[ticker]);}catch(error){loadErrors[ticker]=error.message;}}catch(error){loadErrors[ticker]=error.message;}finally{finished++;repaintData();}}
-async function loadRealData(){if(loading)return;clearTimeout(refreshTimer);loading=true;finished=0;remainingRateRetries=2;for(const key of Object.keys(loadErrors))delete loadErrors[key];for(const key of Object.keys(estimateCache))delete estimateCache[key];updateStatus();try{const status=await getJson('/api/status');if(!status.configured)throw new Error('서버에 Alpha Vantage API 키가 설정되어 있지 않습니다.');const health=await getJson('/api/health').catch(()=>({records:[]}));const ordered=refreshOrder(universe,health.records,[selected,...holdings.map(h=>h.ticker)]);let next=0;await Promise.all(Array.from({length:2},async()=>{while(next<ordered.length){if(document.documentElement.dataset.fundamentalsLoading==='true'){await new Promise(resolve=>setTimeout(resolve,250));continue;}const meta=ordered[next++];await loadOne(meta);}}));for(const row of health.records||[]){if(row.kind==='EARNINGS_ESTIMATES')await loadEstimates(row.ticker);if(row.kind==='EARNINGS_CALENDAR')await getJson('/api/calendar').catch(()=>{});}}catch(error){loadErrors.server=error.message;}finally{loading=false;repaintData();renderHealth();renderChanges();checkAlerts();scheduleRefresh();}}
+function installPacket(ticker){if(universe.some(s=>s.ticker===ticker))installStock(packets[ticker]);else stockMap[ticker]=analyzeStock(packets[ticker]);}
+async function loadOne(meta,countProgress=true,phase='all'){const ticker=meta.ticker;try{if(phase!=='revenue'){const price=await getJson('/api/prices?symbol='+ticker);packets[ticker]={...meta,...price.value,revenue:[],transportStale:!!price.stale,source:price.source,fetchedAt:price.fetchedAt};if(price.stale)loadErrors[ticker]="Last-known price: "+price.warning.message;installPacket(ticker);repaintData();}if(phase==='prices'||!packets[ticker])return;try{const report=await getJson('/api/revenue?symbol='+ticker);packets[ticker].revenue=report.value;packets[ticker].transportStale ||= !!report.stale;if(report.stale)loadErrors[ticker]="Last-known revenue: "+report.warning.message;packets[ticker].revenueFetchedAt=report.fetchedAt;installPacket(ticker);}catch(error){loadErrors[ticker]=error.message;}}catch(error){loadErrors[ticker]=error.message;}finally{if(countProgress)finished++;repaintData();}}
+async function loadRealData(){if(loading)return;clearTimeout(refreshTimer);loading=true;finished=0;remainingRateRetries=2;for(const key of Object.keys(loadErrors))delete loadErrors[key];for(const key of Object.keys(estimateCache))delete estimateCache[key];updateStatus();try{const status=await getJson('/api/status');if(!status.configured)throw new Error('서버에 Alpha Vantage API 키가 설정되어 있지 않습니다.');const health=await getJson('/api/health').catch(()=>({records:[]}));const ordered=refreshOrder(universe,health.records,[selected,...holdings.map(h=>h.ticker)]);for(const phase of ['prices','revenue']){let next=0;await Promise.all(Array.from({length:2},async()=>{while(next<ordered.length){const meta=ordered[next++];await loadOne(meta,phase==='prices',phase);}}));}if(!universe.some(s=>s.ticker===selected))await loadExplorer(explorerMeta.get(selected));// Estimates refresh on demand; avoid competing with price recovery every minute.
+}catch(error){loadErrors.server=error.message;}finally{loading=false;repaintData();renderHealth();renderChanges();checkAlerts();scheduleRefresh();}}
 async function loadEstimates(ticker){if(estimatePending.has(ticker))return;estimatePending.add(ticker);try{estimateCache[ticker]=await getJson('/api/estimates?symbol='+ticker);}catch{estimateCache[ticker]={error:true};}finally{estimatePending.delete(ticker);if(selected===ticker&&chartTab==='guidance')renderExplorer();}}
 setupHoldings(value=>{holdings=value;renderHoldings();});
 let refreshTimer;
