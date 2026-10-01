@@ -28,3 +28,6 @@
 #stock-lookup-results{max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;background:var(--panel)}
 .stock-lookup-result{display:block;text-align:left;width:100%;padding:10px;border:0;border-bottom:1px solid var(--border);background:transparent;color:var(--text);white-space:normal;overflow-wrap:anywhere}
 .stock-lookup-result:hover,.stock-lookup-result:focus{background:var(--bg);outline:2px solid var(--lime);outline-offset:-2px}
+
+.short-outlook{border-top:1px solid var(--border);margin-top:24px;padding-top:20px;line-height:1.65;font-size:14px;overflow-wrap:anywhere}
+.short-outlook h3{font-size:18px}.short-outlook h4{font-size:14px;margin:20px 0 8px}.short-outlook ul{padding-left:20px;margin:0}.short-outlook li{margin:0 0 12px}.outlook-verdict{font-weight:700;font-size:16px}.short-outlook .subtle{font-size:13px}.outlook-compact{font-size:14px;max-width:320px;white-space:normal}
