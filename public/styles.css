@@ -31,3 +31,4 @@
 
 .short-outlook{border-top:1px solid var(--border);margin-top:24px;padding-top:20px;line-height:1.65;font-size:14px;overflow-wrap:anywhere}
 .short-outlook h3{font-size:18px}.short-outlook h4{font-size:14px;margin:20px 0 8px}.short-outlook ul{padding-left:20px;margin:0}.short-outlook li{margin:0 0 12px}.outlook-verdict{font-weight:700;font-size:16px}.short-outlook .subtle{font-size:13px}.outlook-compact{font-size:14px;max-width:320px;white-space:normal}
+.entry-plan{border:1px solid var(--border);border-radius:10px;padding:16px;margin-top:24px;line-height:1.55;font-size:14px;overflow-wrap:anywhere}.entry-plan h3{font-size:18px}.entry-plan dl{margin:0}.entry-plan dl>div{padding:12px 0;border-top:1px solid var(--border)}.entry-plan dt{font-size:14px;color:var(--muted)}.entry-plan dd{margin:4px 0 0}.entry-plan dd strong{font-size:18px}.entry-plan small{display:block;font-size:14px;margin-top:4px}.entry-plan .subtle{font-size:13px}
